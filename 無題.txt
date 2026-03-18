@@ -1,0 +1,7 @@
+プロジェクトフォルダ/
+├── icons/
+│   ├── icon-192.jpg
+│   └── icon-512.jpg
+├── index.html
+├── manifest.json
+└── sw.js

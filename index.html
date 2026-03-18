@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>桜の名所リフト - 日本の絶景桜スポット</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS用メタタグ -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="桜リフト">
+    <link rel="apple-touch-icon" href="icons/icon-192.jpg">
+    
+    <!-- テーマカラー -->
+    <meta name="theme-color" content="#1a1a2e" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f9f7f4" media="(prefers-color-scheme: light)">
+    
+    <style>
+        /* スタイルは前回と同じ */
+        /* ... */
+    </style>
+</head>
+<body>
+    <!-- インストールバナー -->
+    <div id="installBanner" class="install-banner hidden">
+        <div class="install-message">
+            <img src="icons/icon-192.jpg" alt="アイコン" style="width: 32px; height: 32px; border-radius: 8px;">
+            <span>桜の名所リフトをインストール</span>
+        </div>
+        <div>
+            <button id="installButton" class="install-button">インストール</button>
+            <button id="closeInstall" class="close-install">✕</button>
+        </div>
+    </div>
+
+    <h1 id="main-title">🌸 桜の名所リフト</h1>
+    <div class="sub" id="main-sub">一生に一度は見たい絶景桜スポット</div>
+
+    <!-- 言語切り替えボタン -->
+    <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="ja">🇯🇵 日本語</button>
+        <button class="lang-btn" data-lang="en">🇬🇧 English</button>
+        <button class="lang-btn" data-lang="zh">🇨🇳 中文</button>
+    </div>
+
+    <!-- テーマ切り替え -->
+    <div class="theme-control">
+        <button class="theme-toggle" id="themeToggle">🌙 ダークモード / ☀️ クリアモード</button>
+    </div>
+
+    <!-- 戻るボタン -->
+    <div class="nav-container" id="backButtonContainer" style="display: none;">
+        <button class="back-btn" id="backToList">← 一覧に戻る</button>
+    </div>
+
+    <!-- 一覧表示エリア -->
+    <div id="listView">
+        <div class="spots-grid" id="spotsContainer"></div>
+    </div>
+
+    <!-- 詳細表示エリア -->
+    <div id="detailView" class="hidden">
+        <div class="detail-container" id="detailContent"></div>
+    </div>
+
+    <!-- フッター -->
+    <footer id="contact">
+        <p>© 2026 桜の名所リフト</p>
+        <p>📧 お問い合わせ: <a href="mailto:mementomorikatsu@gmail.com" class="contact-email">mementomorikatsu@gmail.com</a></p>
+    </footer>
+
+    <script>
+        // スポットデータ（全10スポット）- 前回と同じ
+        const spotsData = {
+            ja: [ /* 日本語データ */ ],
+            en: [ /* 英語データ */ ],
+            zh: [ /* 中国語データ */ ]
+        };
+
+        // PWAインストール関連
+        let deferredPrompt;
+        const installBanner = document.getElementById('installBanner');
+        const installButton = document.getElementById('installButton');
+        const closeInstall = document.getElementById('closeInstall');
+
+        // インストール済みチェック（localStorage）
+        if (localStorage.getItem('installBannerClosed') === 'true') {
+            installBanner.classList.add('hidden');
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // バナーが閉じられていない場合のみ表示
+            if (localStorage.getItem('installBannerClosed') !== 'true') {
+                installBanner.classList.remove('hidden');
+            }
+        });
+
+        installButton.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('インストール結果:', outcome);
+            
+            deferredPrompt = null;
+            installBanner.classList.add('hidden');
+            localStorage.setItem('installBannerClosed', 'true');
+        });
+
+        closeInstall.addEventListener('click', () => {
+            installBanner.classList.add('hidden');
+            localStorage.setItem('installBannerClosed', 'true');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            installBanner.classList.add('hidden');
+            localStorage.setItem('installBannerClosed', 'true');
+            console.log('アプリがインストールされました');
+        });
+
+        // URLハッシュによるナビゲーション
+        window.addEventListener('hashchange', () => {
+            const hash = window.location.hash;
+            
+            if (hash === '#spots') {
+                backToList();
+            } else if (hash === '#contact') {
+                document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+
+        // メインアプリケーション
+        let currentLang = 'ja';
+        let isDark = true;
+        let currentSpotId = null;
+
+        const container = document.getElementById('spotsContainer');
+        const detailView = document.getElementById('detailView');
+        const listView = document.getElementById('listView');
+        const detailContent = document.getElementById('detailContent');
+        const backButtonContainer = document.getElementById('backButtonContainer');
+        const langBtns = document.querySelectorAll('.lang-btn');
+        const themeToggle = document.getElementById('themeToggle');
+        const mainTitle = document.getElementById('main-title');
+        const mainSub = document.getElementById('main-sub');
+
+        const titles = {
+            ja: '🌸 桜の名所リフト',
+            en: '🌸 Cherry Blossom Spots',
+            zh: '🌸 樱花名胜'
+        };
+        const subs = {
+            ja: '一生に一度は見たい絶景桜スポット',
+            en: 'Must-see cherry blossom spots in Japan',
+            zh: '一生必看的樱花名胜'
+        };
+
+        // 画像エラーハンドラ
+        function handleImageError(img) {
+            img.style.display = 'none';
+            const parent = img.parentNode;
+            const placeholder = document.createElement('div');
+            placeholder.className = 'image-error';
+            placeholder.textContent = '🌸 ' + (img.alt || '画像準備中');
+            parent.appendChild(placeholder);
+        }
+
+        // 一覧表示
+        function renderSpots(lang) {
+            const data = spotsData[lang];
+            container.innerHTML = '';
+            data.forEach(spot => {
+                const card = document.createElement('div');
+                card.className = 'spot-card';
+                card.setAttribute('data-id', spot.id);
+                
+                const img = document.createElement('img');
+                img.src = spot.imageUrl;
+                img.alt = spot.title;
+                img.loading = 'lazy'; // 遅延読み込み
+                img.onerror = function() { handleImageError(this); };
+                
+                const imgDiv = document.createElement('div');
+                imgDiv.className = 'card-img';
+                imgDiv.appendChild(img);
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'card-content';
+                contentDiv.innerHTML = `
+                    <div class="card-title">${spot.title}</div>
+                    <div class="card-location">${spot.location}</div>
+                    <div class="card-best-time">${spot.bestTime}</div>
+                `;
+                
+                card.appendChild(imgDiv);
+                card.appendChild(contentDiv);
+                card.addEventListener('click', () => showDetail(spot.id));
+                container.appendChild(card);
+            });
+        }
+
+        // 詳細表示
+        function showDetail(spotId) {
+            currentSpotId = spotId;
+            const spot = spotsData[currentLang].find(s => s.id === spotId);
+            if (!spot) return;
+
+            const officialLinkText = {
+                ja: '公式ホームページへ',
+                en: 'Official Website',
+                zh: '官方网站'
+            };
+
+            detailContent.innerHTML = '';
+
+            // 画像要素の作成
+            const img = document.createElement('img');
+            img.src = spot.imageUrl;
+            img.alt = spot.title;
+            img.className = 'detail-image';
+            img.loading = 'lazy';
+            img.onerror = function() { 
+                this.style.display = 'none';
+                const placeholder = document.createElement('div');
+                placeholder.className = 'image-error';
+                placeholder.textContent = '🌸 ' + spot.title;
+                this.parentNode.insertBefore(placeholder, this);
+            };
+            detailContent.appendChild(img);
+            
+            // テキスト要素の作成
+            const textDiv = document.createElement('div');
+            textDiv.innerHTML = `
+                <div class="detail-title">${spot.title}</div>
+                <div class="detail-location">📍 ${spot.location}</div>
+                <div class="detail-best-time">${spot.bestTime}</div>
+                <div class="detail-desc">${spot.desc.replace(/\n/g, '<br>')}</div>
+                <a href="${spot.officialUrl}" class="official-link" target="_blank" rel="noopener">${officialLinkText[currentLang]} →</a>
+            `;
+            detailContent.appendChild(textDiv);
+
+            listView.style.display = 'none';
+            detailView.classList.remove('hidden');
+            backButtonContainer.style.display = 'flex';
+            mainTitle.style.display = 'none';
+            mainSub.style.display = 'none';
+            
+            // URLハッシュを更新
+            window.location.hash = `spot-${spotId}`;
+        }
+
+        // 一覧に戻る
+        function backToList() {
+            listView.style.display = 'block';
+            detailView.classList.add('hidden');
+            backButtonContainer.style.display = 'none';
+            mainTitle.style.display = 'block';
+            mainSub.style.display = 'block';
+            currentSpotId = null;
+            
+            // URLハッシュを更新
+            window.location.hash = 'spots';
+        }
+
+        // 言語切替
+        function changeLanguage(lang) {
+            currentLang = lang;
+            renderSpots(currentLang);
+            
+            if (currentSpotId) {
+                const spotExists = spotsData[currentLang].some(s => s.id === currentSpotId);
+                if (spotExists) {
+                    showDetail(currentSpotId);
+                } else {
+                    backToList();
+                }
+            } else {
+                backToList();
+            }
+            
+            mainTitle.textContent = titles[lang];
+            mainSub.textContent = subs[lang];
+            
+            // アクティブな言語ボタンの更新
+            langBtns.forEach(btn => {
+                if (btn.dataset.lang === lang) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        // イベントリスナー
+        langBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                changeLanguage(btn.dataset.lang);
+            });
+        });
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            isDark = !document.body.classList.contains('light-mode');
+            themeToggle.innerHTML = isDark ? '🌙 ダークモード / ☀️ クリアモード' : '☀️ クリアモード / 🌙 ダークモード';
+            
+            // テーマカラーの更新
+            const themeColor = document.querySelector('meta[name="theme-color"]');
+            if (themeColor) {
+                themeColor.setAttribute('content', isDark ? '#1a1a2e' : '#f9f7f4');
+            }
+        });
+
+        document.getElementById('backToList').addEventListener('click', backToList);
+
+        // 初期表示
+        renderSpots('ja');
+
+        // Service Worker登録
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration);
+                    })
+                    .catch(err => {
+                        console.log('Service Worker error:', err);
+                    });
+            });
+        }
+
+        // オフライン検出
+        window.addEventListener('online', () => {
+            document.body.classList.remove('offline');
+            console.log('オンラインに復帰');
+        });
+
+        window.addEventListener('offline', () => {
+            document.body.classList.add('offline');
+            console.log('オフラインになりました');
+        });
+    </script>
+</body>
+</html>
