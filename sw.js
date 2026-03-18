@@ -2,8 +2,8 @@ const CACHE_NAME = 'sakura-lift-v3';
 const urlsToCache = [
   'index.html',
   'manifest.json',
-  'icons/icon-192.jpg',
-  'icons/icon-512.jpg'
+  'icons/icon-192.png',
+  'icons/icon-512.png'
 ];
 
 // インストールイベント
@@ -86,7 +86,7 @@ self.addEventListener('fetch', event => {
           .catch(() => {
             // 画像取得失敗時のフォールバック - アイコン画像を返す
             console.log('画像取得失敗、フォールバック:', url);
-            return caches.match('icons/icon-192.jpg');
+            return caches.match('icons/icon-192.png');
           });
       })
     );
@@ -136,7 +136,7 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', event => {
   const options = {
     body: event.data.text(),
-    icon: 'icons/icon-192.jpg',
+    icon: 'icons/icon-192.png',
     badge: 'icons/icon-192.jpg',
     vibrate: [200, 100, 200],
     actions: [
